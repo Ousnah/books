@@ -12,7 +12,7 @@ Installez les bibliothèques Python requises avec pip :
 
 `pip install beautifulsoup4`
 
-#Lancez le projet avec:
+# Lancez le projet avec:
 
 `python3 books.py`
    
