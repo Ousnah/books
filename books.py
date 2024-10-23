@@ -1,7 +1,21 @@
 import requests, csv, os
 from bs4 import BeautifulSoup
 
-def extract_book_data(url):
+base_url = 'https://books.toscrape.com/'
+
+def download_image(image_url, category, title):
+    response = requests.get(image_url)
+    image_folder = 'images/{category}'
+    if not os.path.exists(image_folder):
+        os.makedirs(image_folder)
+        print(f"Dossier '{image_folder}' créé avec succès.")
+
+    image_filename = f"{image_folder}/{title.replace(' ', '_').replace('/', '-')}.jpg"
+
+    with open(image_filename, 'wb') as img_file:
+        img_file.write(response.content)
+    print(f"Image téléchargée : {image_filename}")
+def extract_book_data(url, category):
     response = requests.get(url)
     soup = BeautifulSoup(response.content, 'html.parser')
 
@@ -12,12 +26,11 @@ def extract_book_data(url):
     price_excluding_tax = soup.find('table', class_='table table-striped').find_all('td')[2].get_text()
     number_available = soup.find('table', class_='table table-striped').find_all('td')[5].get_text()
     product_description = soup.find('meta', {'name': 'description'})['content'].strip()
-    category = soup.find('ul', class_='breadcrumb').find_all('a')[2].get_text()
     review_rating = soup.find('p', class_='star-rating')['class'][1]
     image_url = "https://books.toscrape.com/" + soup.find('img')['src'].replace('../', '')
 
-    download_image(image_url, title)
-    
+    download_image(image_url, category, title)
+
     return {
             'product_page_url': product_page_url,
             'upc': upc,
@@ -53,29 +66,42 @@ def extract_category_book_urls(category_url):
             break
 
     return book_urls
+def extract_categories():
+    response = requests.get(base_url)
+    soup = BeautifulSoup(response.content, 'html.parser')
 
-def download_image(image_url, title):
-    response = requests.get(image_url)
-    image_folder = 'images'
-    if not os.path.exists(image_folder):
-        os.makedirs(image_folder)
+    categories = {}
+    category_list = soup.find('ul', class_='nav-list').find('ul').find_all('li')
 
-    image_filename = f"{image_folder}/{title.replace(' ', '_').replace('/', '-')}.jpg"
+    for category in category_list:
+        category_name = category.get_text().strip()
+        category_url = base_url + category.find('a')['href']
+        categories[category_name] = category_url
 
-    with open(image_filename, 'wb') as img_file:
-        img_file.write(response.content)
-    print(f"Image téléchargée : {image_filename}")
+    return categories
+
+def scrape_all_categories():
+    categories = extract_categories()
+
+    for category, category_url in categories.items():
+        print(f"Scraping la catégorie : {category}")
+
+        book_urls = extract_category_book_urls(category_url)
+        csv_filename = f"{category.replace(' ', '_').replace('/', '-')}.csv"
+
+        with open(csv_filename, mode='w', newline='', encoding='utf-8') as file:
+            writer = csv.DictWriter(file, fieldnames=['product_page_url', 'upc', 'title', 'price_including_tax', 'price_excluding_tax',
+                                                     'number_available', 'product_description', 'category', 'review_rating', 'image_url'])
+            writer.writeheader()
+
+            for book_url in book_urls:
+                book_data = extract_book_data(book_url, category)
+                writer.writerow(book_data)
+
+        print(f"Données pour la catégorie '{category}' enregistrées dans '{csv_filename}'.")
+
+scrape_all_categories()
 
 category_url = "https://books.toscrape.com/catalogue/category/books/mystery_3/index.html"
-
-book_urls = extract_category_book_urls(category_url)
-with open('book_info.csv', mode='w', newline='') as file:
-    writer = csv.DictWriter(file, fieldnames=['product_page_url', 'upc', 'title', 'price_including_tax', 'price_excluding_tax',
-                     'number_available', 'product_description', 'category', 'review_rating', 'image_url'])
-    writer.writeheader()
-
-    for book_url in book_urls:
-        book_data = extract_book_data(book_url)
-        writer.writerow(book_data)
 
 print("Données envoyées dans 'book_info.csv'")
