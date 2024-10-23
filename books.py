@@ -1,6 +1,5 @@
-import requests
+import requests, csv, os
 from bs4 import BeautifulSoup
-import csv
 
 def extract_book_data(url):
     response = requests.get(url)
@@ -17,6 +16,8 @@ def extract_book_data(url):
     review_rating = soup.find('p', class_='star-rating')['class'][1]
     image_url = "https://books.toscrape.com/" + soup.find('img')['src'].replace('../', '')
 
+    download_image(image_url, title)
+    
     return {
             'product_page_url': product_page_url,
             'upc': upc,
@@ -52,6 +53,18 @@ def extract_category_book_urls(category_url):
             break
 
     return book_urls
+
+def download_image(image_url, title):
+    response = requests.get(image_url)
+    image_folder = 'images'
+    if not os.path.exists(image_folder):
+        os.makedirs(image_folder)
+
+    image_filename = f"{image_folder}/{title.replace(' ', '_').replace('/', '-')}.jpg"
+
+    with open(image_filename, 'wb') as img_file:
+        img_file.write(response.content)
+    print(f"Image téléchargée : {image_filename}")
 
 category_url = "https://books.toscrape.com/catalogue/category/books/mystery_3/index.html"
 
